@@ -512,6 +512,55 @@
         }
       }
     },
+    "/api/{session}/set-online-presence": {
+      "post": {
+        "tags": ["Misc"],
+        "description": "",
+        "operationId": "setOnlinePresence",
+        "parameters": [
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "NERDWHATS_AMERICA"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "isOnline": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "example": {
+                "isOnline": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/{session}/download-media": {
       "post": {
         "tags": ["Messages"],
@@ -594,7 +643,19 @@
                 "type": "object",
                 "properties": {
                   "phone": {
-                    "type": "string"
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "description": "Single phone number"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Array of phone numbers for bulk messaging"
+                      }
+                    ]
                   },
                   "isGroup": {
                     "type": "boolean"
@@ -640,6 +701,116 @@
                     "phone": "8865623215244578",
                     "isGroup": true,
                     "message": "Hi from WPPConnect"
+                  }
+                },
+                "Send message to multiple contacts": {
+                  "value": {
+                    "phone": [
+                      "5521999999999",
+                      "5521888888888",
+                      "5521777777777"
+                    ],
+                    "isGroup": false,
+                    "isNewsletter": false,
+                    "isLid": false,
+                    "message": "Hi from WPPConnect to multiple contacts"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{session}/send-bulk-message": {
+      "post": {
+        "tags": ["Messages"],
+        "description": "",
+        "parameters": [
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "NERDWHATS_AMERICA"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phones": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Array of phone numbers for bulk messaging"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "isGroup": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "isNewsletter": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "isLid": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "options": {
+                    "type": "object"
+                  },
+                  "delay": {
+                    "type": "number",
+                    "description": "Delay in milliseconds between messages (default: 1000)",
+                    "default": 1000
+                  }
+                },
+                "required": ["phones", "message"]
+              },
+              "examples": {
+                "Send bulk message to multiple contacts": {
+                  "value": {
+                    "phones": [
+                      "5521999999999",
+                      "5521888888888",
+                      "5521777777777"
+                    ],
+                    "message": "Hi from WPPConnect - Bulk Message",
+                    "isGroup": false,
+                    "delay": 2000
+                  }
+                },
+                "Send bulk message with options": {
+                  "value": {
+                    "phones": ["5521999999999", "5521888888888"],
+                    "message": "Bulk message with reply",
+                    "options": {
+                      "quotedMsg": "true_...@c.us_3EB01DE65ACC6_out"
+                    },
+                    "delay": 1500
                   }
                 }
               }
@@ -706,7 +877,6 @@
     },
     "/api/{session}/send-image": {
       "post": {
-        "tags": ["Messages"],
         "description": "",
         "parameters": [
           {
@@ -714,68 +884,13 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "example": "NERDWHATS_AMERICA"
+              "type": "string"
             }
           }
         ],
         "responses": {
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "phone": {
-                    "type": "string"
-                  },
-                  "isGroup": {
-                    "type": "boolean"
-                  },
-                  "isNewsletter": {
-                    "type": "boolean"
-                  },
-                  "isLid": {
-                    "type": "boolean"
-                  },
-                  "filename": {
-                    "type": "string"
-                  },
-                  "caption": {
-                    "type": "string"
-                  },
-                  "base64": {
-                    "type": "string"
-                  }
-                }
-              },
-              "examples": {
-                "Default": {
-                  "value": {
-                    "phone": "5521999999999",
-                    "isGroup": false,
-                    "isNewsletter": false,
-                    "isLid": false,
-                    "filename": "file name lol",
-                    "caption": "caption for my file",
-                    "base64": "<base64> string"
-                  }
-                }
-              }
-            }
+          "default": {
+            "description": ""
           }
         }
       }
@@ -965,7 +1080,6 @@
     },
     "/api/{session}/send-file": {
       "post": {
-        "tags": ["Messages"],
         "description": "",
         "parameters": [
           {
@@ -973,73 +1087,18 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "example": "NERDWHATS_AMERICA"
+              "type": "string"
             }
           }
         ],
         "responses": {
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "phone": {
-                    "type": "string"
-                  },
-                  "isGroup": {
-                    "type": "boolean"
-                  },
-                  "isNewsletter": {
-                    "type": "boolean"
-                  },
-                  "isLid": {
-                    "type": "boolean"
-                  },
-                  "filename": {
-                    "type": "string"
-                  },
-                  "caption": {
-                    "type": "string"
-                  },
-                  "base64": {
-                    "type": "string"
-                  }
-                }
-              },
-              "examples": {
-                "Default": {
-                  "value": {
-                    "phone": "5521999999999",
-                    "isGroup": false,
-                    "isNewsletter": false,
-                    "isLid": false,
-                    "filename": "file name lol",
-                    "caption": "caption for my file",
-                    "base64": "<base64> string"
-                  }
-                }
-              }
-            }
+          "default": {
+            "description": ""
           }
         }
       }
     },
-    "/api/{session}/send-file-base64": {
+    "/api/{session}/send-bulk-file": {
       "post": {
         "tags": ["Messages"],
         "description": "",
@@ -1055,6 +1114,9 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "OK"
+          },
           "400": {
             "description": "Bad Request"
           },
@@ -1074,8 +1136,12 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "phone": {
-                    "type": "string"
+                  "phones": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Array of phone numbers for bulk file sending"
                   },
                   "isGroup": {
                     "type": "boolean"
@@ -1094,23 +1160,48 @@
                   },
                   "base64": {
                     "type": "string"
+                  },
+                  "delay": {
+                    "type": "number",
+                    "description": "Delay in milliseconds between messages (default: 1000)",
+                    "default": 1000
                   }
-                }
+                },
+                "required": ["phones", "base64"]
               },
               "examples": {
-                "Default": {
+                "Send file to multiple contacts": {
                   "value": {
-                    "phone": "5521999999999",
+                    "phones": ["5521999999999", "5521888888888"],
                     "isGroup": false,
-                    "isNewsletter": false,
-                    "isLid": false,
-                    "filename": "file name lol",
-                    "caption": "caption for my file",
-                    "base64": "<base64> string"
+                    "filename": "document.pdf",
+                    "caption": "Important document",
+                    "base64": "<base64_string>",
+                    "delay": 2000
                   }
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/{session}/send-file-base64": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": ""
           }
         }
       }

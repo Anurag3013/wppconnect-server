@@ -48,7 +48,12 @@ export async function sendMessage(req: Request, res: Response) {
           schema: {
             type: "object",
             properties: {
-              phone: { type: "string" },
+              phone: {
+                oneOf: [
+                  { type: "string", description: "Single phone number" },
+                  { type: "array", items: { type: "string" }, description: "Array of phone numbers for bulk messaging" }
+                ]
+              },
               isGroup: { type: "boolean" },
               isNewsletter: { type: "boolean" },
               isLid: { type: "boolean" },
@@ -58,7 +63,7 @@ export async function sendMessage(req: Request, res: Response) {
           },
           examples: {
             "Send message to contact": {
-              value: { 
+              value: {
                 phone: '5521999999999',
                 isGroup: false,
                 isNewsletter: false,
@@ -67,7 +72,7 @@ export async function sendMessage(req: Request, res: Response) {
               }
             },
             "Send message with reply": {
-              value: { 
+              value: {
                 phone: '5521999999999',
                 isGroup: false,
                 isNewsletter: false,
@@ -85,6 +90,15 @@ export async function sendMessage(req: Request, res: Response) {
                 message: 'Hi from WPPConnect',
               }
             },
+            "Send message to multiple contacts": {
+              value: {
+                phone: ['5521999999999', '5521888888888', '5521777777777'],
+                isGroup: false,
+                isNewsletter: false,
+                isLid: false,
+                message: 'Hi from WPPConnect to multiple contacts',
+              }
+            },
           }
         }
       }
@@ -96,13 +110,143 @@ export async function sendMessage(req: Request, res: Response) {
 
   try {
     const results: any = [];
-    for (const contato of phone) {
+
+    // Handle both single phone number (string) and multiple phone numbers (array)
+    const phoneNumbers = Array.isArray(phone) ? phone : [phone];
+
+    for (const contato of phoneNumbers) {
       results.push(await req.client.sendText(contato, message, options));
     }
 
     if (results.length === 0) res.status(400).json('Error sending message');
     req.io.emit('mensagem-enviada', results);
     returnSucess(res, results);
+  } catch (error) {
+    returnError(req, res, error);
+  }
+}
+
+export async function sendBulkMessage(req: Request, res: Response) {
+  /**
+   * #swagger.tags = ["Messages"]
+     #swagger.autoBody=false
+     #swagger.security = [{
+            "bearerAuth": []
+     }]
+     #swagger.parameters["session"] = {
+      schema: 'NERDWHATS_AMERICA'
+     }
+    #swagger.requestBody = {
+      required: true,
+      "@content": {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              phones: {
+                type: "array",
+                items: { type: "string" },
+                description: "Array of phone numbers for bulk messaging"
+              },
+              message: { type: "string" },
+              isGroup: { type: "boolean", default: false },
+              isNewsletter: { type: "boolean", default: false },
+              isLid: { type: "boolean", default: false },
+              options: { type: "object" },
+              delay: { type: "number", description: "Delay in milliseconds between messages (default: 1000)", default: 1000 }
+            },
+            required: ["phones", "message"]
+          },
+          examples: {
+            "Send bulk message to multiple contacts": {
+              value: {
+                phones: ['5521999999999', '5521888888888', '5521777777777'],
+                message: 'Hi from WPPConnect - Bulk Message',
+                isGroup: false,
+                delay: 2000
+              }
+            },
+            "Send bulk message with options": {
+              value: {
+                phones: ['5521999999999', '5521888888888'],
+                message: 'Bulk message with reply',
+                options: {
+                  quotedMsg: 'true_...@c.us_3EB01DE65ACC6_out',
+                },
+                delay: 1500
+              }
+            }
+          }
+        }
+      }
+     }
+   */
+  const {
+    phones,
+    message,
+    isGroup = false,
+    isNewsletter = false,
+    isLid = false,
+    delay = 1000,
+  } = req.body;
+  const options = req.body.options || {};
+
+  if (!Array.isArray(phones) || phones.length === 0) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'phones must be a non-empty array',
+    });
+  }
+
+  try {
+    const results: any = [];
+    const errors: any = [];
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < phones.length; i++) {
+      const phone = phones[i];
+      try {
+        const result = await req.client.sendText(phone, message, options);
+        results.push({
+          phone: phone,
+          status: 'success',
+          result: result,
+        });
+        successCount++;
+
+        // Add delay between messages to avoid being blocked
+        if (i < phones.length - 1 && delay > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      } catch (error) {
+        errors.push({
+          phone: phone,
+          status: 'error',
+          error: error,
+        });
+        errorCount++;
+      }
+    }
+
+    req.io.emit('bulk-message-sent', {
+      total: phones.length,
+      success: successCount,
+      errors: errorCount,
+      results: results,
+    });
+
+    res.status(200).json({
+      status: 'completed',
+      message: `Bulk message sent to ${phones.length} contacts`,
+      summary: {
+        total: phones.length,
+        success: successCount,
+        errors: errorCount,
+      },
+      results: results,
+      errors: errors.length > 0 ? errors : undefined,
+    });
   } catch (error) {
     returnError(req, res, error);
   }
@@ -132,7 +276,7 @@ export async function editMessage(req: Request, res: Response) {
           },
           examples: {
             "Edit a message": {
-              value: { 
+              value: {
                 id: 'true_5521999999999@c.us_3EB04FCAA1527EB6D9DEC8',
                 newText: 'New text for message'
               }
@@ -150,6 +294,136 @@ export async function editMessage(req: Request, res: Response) {
 
     req.io.emit('edited-message', edited);
     returnSucess(res, edited);
+  } catch (error) {
+    returnError(req, res, error);
+  }
+}
+
+export async function sendBulkFile(req: Request, res: Response) {
+  /**
+   * #swagger.tags = ["Messages"]
+     #swagger.autoBody=false
+     #swagger.security = [{
+            "bearerAuth": []
+     }]
+     #swagger.parameters["session"] = {
+      schema: 'NERDWHATS_AMERICA'
+     }
+     #swagger.requestBody = {
+      required: true,
+      "@content": {
+        "application/json": {
+            schema: {
+                type: "object",
+                properties: {
+                    "phones": {
+                      type: "array",
+                      items: { type: "string" },
+                      description: "Array of phone numbers for bulk file sending"
+                    },
+                    "isGroup": { type: "boolean" },
+                    "isNewsletter": { type: "boolean" },
+                    "isLid": { type: "boolean" },
+                    "filename": { type: "string" },
+                    "caption": { type: "string" },
+                    "base64": { type: "string" },
+                    "delay": { type: "number", description: "Delay in milliseconds between messages (default: 1000)", default: 1000 }
+                },
+                required: ["phones", "base64"]
+            },
+            examples: {
+                "Send file to multiple contacts": {
+                    value: {
+                        "phones": ["5521999999999", "5521888888888"],
+                        "isGroup": false,
+                        "filename": "document.pdf",
+                        "caption": "Important document",
+                        "base64": "<base64_string>",
+                        "delay": 2000
+                    }
+                }
+            }
+        }
+      }
+    }
+   */
+  const {
+    phones,
+    path,
+    base64,
+    filename = 'file',
+    message,
+    caption,
+    quotedMessageId,
+    delay = 1000,
+  } = req.body;
+
+  const options = req.body.options || {};
+
+  if (!Array.isArray(phones) || phones.length === 0) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'phones must be a non-empty array',
+    });
+  }
+
+  if (!path && !req.file && !base64)
+    return res.status(401).send({
+      message: 'Sending the file is mandatory',
+    });
+
+  const pathFile = path || base64 || req.file?.path;
+  const msg = message || caption;
+
+  try {
+    const results: any = [];
+    const errors: any = [];
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < phones.length; i++) {
+      const phone = phones[i];
+      try {
+        const result = await req.client.sendFile(phone, pathFile, {
+          filename: filename,
+          caption: msg,
+          quotedMsg: quotedMessageId,
+          ...options,
+        });
+        results.push({
+          phone: phone,
+          status: 'success',
+          result: result,
+        });
+        successCount++;
+
+        // Add delay between messages to avoid being blocked
+        if (i < phones.length - 1 && delay > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      } catch (error) {
+        errors.push({
+          phone: phone,
+          status: 'error',
+          error: error,
+        });
+        errorCount++;
+      }
+    }
+
+    if (req.file) await unlinkAsync(pathFile);
+
+    res.status(200).json({
+      status: 'completed',
+      message: `Bulk file sent to ${phones.length} contacts`,
+      summary: {
+        total: phones.length,
+        success: successCount,
+        errors: errorCount,
+      },
+      results: results,
+      errors: errors.length > 0 ? errors : undefined,
+    });
   } catch (error) {
     returnError(req, res, error);
   }
@@ -220,7 +494,11 @@ export async function sendFile(req: Request, res: Response) {
 
   try {
     const results: any = [];
-    for (const contact of phone) {
+
+    // Handle both single phone number (string) and multiple phone numbers (array)
+    const phoneNumbers = Array.isArray(phone) ? phone : [phone];
+
+    for (const contact of phoneNumbers) {
       results.push(
         await req.client.sendFile(contact, pathFile, {
           filename: filename,
@@ -286,7 +564,11 @@ export async function sendVoice(req: Request, res: Response) {
 
   try {
     const results: any = [];
-    for (const contato of phone) {
+
+    // Handle both single phone number (string) and multiple phone numbers (array)
+    const phoneNumbers = Array.isArray(phone) ? phone : [phone];
+
+    for (const contato of phoneNumbers) {
       results.push(
         await req.client.sendPtt(
           contato,
@@ -536,7 +818,7 @@ export async function sendListMessage(req: Request, res: Response) {
           },
           examples: {
             "Send list message": {
-              value: { 
+              value: {
                 phone: '5521999999999',
                 isGroup: false,
                 description: 'Desc for list',
@@ -619,7 +901,7 @@ export async function sendOrderMessage(req: Request, res: Response) {
           },
           examples: {
             "Send with custom items": {
-              value: { 
+              value: {
                 phone: '5521999999999',
                 isGroup: false,
                 items: [
@@ -639,7 +921,7 @@ export async function sendOrderMessage(req: Request, res: Response) {
               }
             },
             "Send with product items": {
-              value: { 
+              value: {
                 phone: '5521999999999',
                 isGroup: false,
                 items: [
@@ -653,7 +935,7 @@ export async function sendOrderMessage(req: Request, res: Response) {
               }
             },
             "Send with custom items and options": {
-              value: { 
+              value: {
                 phone: '5521999999999',
                 isGroup: false,
                 items: [

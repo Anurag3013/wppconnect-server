@@ -78,7 +78,6 @@ routes.post(
 routes.post(
   '/api/:session/logout-session',
   verifyToken,
-  statusConnection,
   SessionController.logOutSession
 );
 routes.post(
@@ -113,6 +112,12 @@ routes.post(
   verifyToken,
   statusConnection,
   MessageController.sendMessage
+);
+routes.post(
+  '/api/:session/send-bulk-message',
+  verifyToken,
+  statusConnection,
+  MessageController.sendBulkMessage
 );
 routes.post(
   '/api/:session/edit-message',
@@ -153,6 +158,13 @@ routes.post(
   verifyToken,
   statusConnection,
   MessageController.sendFile
+);
+routes.post(
+  '/api/:session/send-bulk-file',
+  upload.single('file'),
+  verifyToken,
+  statusConnection,
+  MessageController.sendBulkFile
 );
 routes.post(
   '/api/:session/send-file-base64',

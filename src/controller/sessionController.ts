@@ -282,43 +282,56 @@ export async function logOutSession(req: Request, res: Response): Promise<any> {
    */
   try {
     const session = req.session;
-    await req.client.logout();
+
+    // Try to logout from WhatsApp client if it exists and is connected
+    if (req.client) {
+      try {
+        await req.client.logout();
+      } catch (logoutError) {
+        req.logger.warn(`Logout error for session ${session}:`, logoutError);
+        // Continue with cleanup even if logout fails
+      }
+    }
+
+    // Remove session from array
     deleteSessionOnArray(req.session);
 
-    setTimeout(async () => {
-      const pathUserData = config.customUserDataDir + req.session;
-      const pathTokens = __dirname + `../../../tokens/${req.session}.data.json`;
+    // Perform cleanup operations
+    const pathUserData = config.customUserDataDir + req.session;
+    const pathTokens = __dirname + `../../../tokens/${req.session}.data.json`;
 
-      if (fs.existsSync(pathUserData)) {
-        await fs.promises.rm(pathUserData, {
-          recursive: true,
-          maxRetries: 5,
-          force: true,
-          retryDelay: 1000,
-        });
-      }
-      if (fs.existsSync(pathTokens)) {
-        await fs.promises.rm(pathTokens, {
-          recursive: true,
-          maxRetries: 5,
-          force: true,
-          retryDelay: 1000,
-        });
-      }
+    if (fs.existsSync(pathUserData)) {
+      await fs.promises.rm(pathUserData, {
+        recursive: true,
+        maxRetries: 5,
+        force: true,
+        retryDelay: 1000,
+      });
+    }
+    if (fs.existsSync(pathTokens)) {
+      await fs.promises.rm(pathTokens, {
+        recursive: true,
+        maxRetries: 5,
+        force: true,
+        retryDelay: 1000,
+      });
+    }
 
-      req.io.emit('whatsapp-status', false);
+    // Emit events and call webhook
+    req.io.emit('whatsapp-status', false);
+    if (req.client) {
       callWebHook(req.client, req, 'logoutsession', {
         message: `Session: ${session} logged out`,
         connected: false,
       });
+    }
 
-      return await res
-        .status(200)
-        .json({ status: true, message: 'Session successfully closed' });
-    }, 500);
-    /*try {
-      await req.client.close();
-    } catch (error) {}*/
+    // Return success response immediately
+    res.status(200).json({
+      status: true,
+      message: 'Session successfully closed',
+      session: session,
+    });
   } catch (error) {
     req.logger.error(error);
     res
@@ -746,7 +759,7 @@ export async function editBusinessProfile(req: Request, res: Response) {
         ],
       }
      }
-     
+
      #swagger.requestBody = {
       required: true,
       "@content": {
