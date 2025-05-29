@@ -16,7 +16,7 @@
 
 import { Request, Response } from 'express';
 
-import { unlinkAsync } from '../util/functions';
+import { unlinkAsync, contactToArray } from '../util/functions';
 
 function returnError(req: Request, res: Response, error: any) {
   req.logger.error(error);
@@ -104,15 +104,21 @@ export async function sendMessage(req: Request, res: Response) {
       }
      }
    */
-  const { phone, message } = req.body;
+  const {
+    phone,
+    message,
+    isGroup = false,
+    isNewsletter = false,
+    isLid = false,
+  } = req.body;
 
   const options = req.body.options || {};
 
   try {
     const results: any = [];
 
-    // Handle both single phone number (string) and multiple phone numbers (array)
-    const phoneNumbers = Array.isArray(phone) ? phone : [phone];
+    // Use contactToArray to properly format phone numbers
+    const phoneNumbers = contactToArray(phone, isGroup, isNewsletter, isLid);
 
     for (const contato of phoneNumbers) {
       results.push(await req.client.sendText(contato, message, options));
@@ -204,24 +210,39 @@ export async function sendBulkMessage(req: Request, res: Response) {
     let successCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < phones.length; i++) {
-      const phone = phones[i];
+    // Use contactToArray to properly format phone numbers
+    const formattedPhones = contactToArray(
+      phones,
+      isGroup,
+      isNewsletter,
+      isLid
+    );
+
+    for (let i = 0; i < formattedPhones.length; i++) {
+      const originalPhone = phones[i];
+      const formattedPhone = formattedPhones[i];
       try {
-        const result = await req.client.sendText(phone, message, options);
+        const result = await req.client.sendText(
+          formattedPhone,
+          message,
+          options
+        );
         results.push({
-          phone: phone,
+          phone: originalPhone,
+          formattedPhone: formattedPhone,
           status: 'success',
           result: result,
         });
         successCount++;
 
         // Add delay between messages to avoid being blocked
-        if (i < phones.length - 1 && delay > 0) {
+        if (i < formattedPhones.length - 1 && delay > 0) {
           await new Promise((resolve) => setTimeout(resolve, delay));
         }
       } catch (error) {
         errors.push({
-          phone: phone,
+          phone: originalPhone,
+          formattedPhone: formattedPhone,
           status: 'error',
           error: error,
         });
@@ -356,6 +377,9 @@ export async function sendBulkFile(req: Request, res: Response) {
     caption,
     quotedMessageId,
     delay = 1000,
+    isGroup = false,
+    isNewsletter = false,
+    isLid = false,
   } = req.body;
 
   const options = req.body.options || {};
@@ -381,29 +405,40 @@ export async function sendBulkFile(req: Request, res: Response) {
     let successCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < phones.length; i++) {
-      const phone = phones[i];
+    // Use contactToArray to properly format phone numbers
+    const formattedPhones = contactToArray(
+      phones,
+      isGroup,
+      isNewsletter,
+      isLid
+    );
+
+    for (let i = 0; i < formattedPhones.length; i++) {
+      const originalPhone = phones[i];
+      const formattedPhone = formattedPhones[i];
       try {
-        const result = await req.client.sendFile(phone, pathFile, {
+        const result = await req.client.sendFile(formattedPhone, pathFile, {
           filename: filename,
           caption: msg,
           quotedMsg: quotedMessageId,
           ...options,
         });
         results.push({
-          phone: phone,
+          phone: originalPhone,
+          formattedPhone: formattedPhone,
           status: 'success',
           result: result,
         });
         successCount++;
 
         // Add delay between messages to avoid being blocked
-        if (i < phones.length - 1 && delay > 0) {
+        if (i < formattedPhones.length - 1 && delay > 0) {
           await new Promise((resolve) => setTimeout(resolve, delay));
         }
       } catch (error) {
         errors.push({
-          phone: phone,
+          phone: originalPhone,
+          formattedPhone: formattedPhone,
           status: 'error',
           error: error,
         });
@@ -480,6 +515,9 @@ export async function sendFile(req: Request, res: Response) {
     message,
     caption,
     quotedMessageId,
+    isGroup = false,
+    isNewsletter = false,
+    isLid = false,
   } = req.body;
 
   const options = req.body.options || {};
@@ -495,8 +533,8 @@ export async function sendFile(req: Request, res: Response) {
   try {
     const results: any = [];
 
-    // Handle both single phone number (string) and multiple phone numbers (array)
-    const phoneNumbers = Array.isArray(phone) ? phone : [phone];
+    // Use contactToArray to properly format phone numbers
+    const phoneNumbers = contactToArray(phone, isGroup, isNewsletter, isLid);
 
     for (const contact of phoneNumbers) {
       results.push(
@@ -560,13 +598,16 @@ export async function sendVoice(req: Request, res: Response) {
     filename = 'Voice Audio',
     message,
     quotedMessageId,
+    isGroup = false,
+    isNewsletter = false,
+    isLid = false,
   } = req.body;
 
   try {
     const results: any = [];
 
-    // Handle both single phone number (string) and multiple phone numbers (array)
-    const phoneNumbers = Array.isArray(phone) ? phone : [phone];
+    // Use contactToArray to properly format phone numbers
+    const phoneNumbers = contactToArray(phone, isGroup, isNewsletter, isLid);
 
     for (const contato of phoneNumbers) {
       results.push(

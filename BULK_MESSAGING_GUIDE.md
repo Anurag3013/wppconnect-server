@@ -124,21 +124,39 @@ Send files (images, documents, etc.) to multiple contacts.
 
 ## Phone Number Formats
 
-The system automatically handles phone number formatting:
+The system automatically handles phone number formatting using the `contactToArray` function:
 
 ### Individual Contacts:
 
 - `5521999999999` → `5521999999999@c.us`
-- `+5521999999999` → `5521999999999@c.us`
+- `+5521999999999` → `5521999999999@c.us` (plus sign removed)
+- `55 21 99999-9999` → `5521999999999@c.us` (spaces and dashes removed)
+- `(21) 99999-9999` → `21999999999@c.us` (parentheses and formatting removed)
 
 ### Groups:
 
 - `120363043968123456` → `120363043968123456@g.us`
+- Set `isGroup: true` in your request
+
+### Newsletter Contacts:
+
+- `5521999999999` → `5521999999999@newsletter`
+- Set `isNewsletter: true` in your request
+
+### LID Contacts (Long ID):
+
+- `123456789012345678` → `123456789012345678@lid`
+- Set `isLid: true` or phone number length > 14 digits
 
 ### Input Formats Supported:
 
-- Array: `["5521999999999", "5521888888888"]`
-- String with separators: `"5521999999999,5521888888888"` or `"5521999999999;5521888888888"`
+- **Array**: `["5521999999999", "5521888888888"]`
+- **String with separators**: `"5521999999999,5521888888888"` or `"5521999999999;5521888888888"`
+- **Mixed formats**: `["+5521999999999", "55 21 88888-8888", "5521777777777"]`
+
+### ✅ **Fixed Issue**:
+
+The phone number formatting now works correctly! Previously, bulk messages were creating invalid numbers, but now all APIs use the proper `contactToArray` function to ensure messages go to the correct original numbers you specify.
 
 ## Best Practices
 

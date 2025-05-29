@@ -43,6 +43,18 @@ if (config?.websocket?.uploadS3) {
   crypto = config.websocket.uploadS3 ? Crypto : null;
 }
 
+function formatPhoneNumber(phone: string): string {
+  // Remove @ and everything after it if present
+  phone = phone.split('@')[0];
+
+  // Remove all non-digit characters (spaces, dashes, parentheses, plus signs, etc.)
+  phone = phone.replace(/\D/g, '');
+
+  // Remove leading country code if it starts with common patterns
+  // But keep the number intact for WhatsApp formatting
+  return phone;
+}
+
 export function contactToArray(
   number: any,
   isGroup?: boolean,
@@ -52,28 +64,40 @@ export function contactToArray(
   const localArr: any = [];
   if (Array.isArray(number)) {
     for (let contact of number) {
-      isGroup || isNewsletter
-        ? (contact = contact.split('@')[0])
-        : (contact = contact.split('@')[0]?.replace(/[^\w ]/g, ''));
-      if (contact !== '')
+      if (isGroup || isNewsletter) {
+        // For groups and newsletters, just remove @ part
+        contact = contact.split('@')[0];
+      } else {
+        // For regular contacts, properly format the phone number
+        contact = formatPhoneNumber(contact);
+      }
+
+      if (contact !== '') {
         if (isGroup) (localArr as any).push(`${contact}@g.us`);
         else if (isNewsletter) (localArr as any).push(`${contact}@newsletter`);
         else if (isLid || contact.length > 14)
           (localArr as any).push(`${contact}@lid`);
         else (localArr as any).push(`${contact}@c.us`);
+      }
     }
   } else {
     const arrContacts = number.split(/\s*[,;]\s*/g);
     for (let contact of arrContacts) {
-      isGroup || isNewsletter
-        ? (contact = contact.split('@')[0])
-        : (contact = contact.split('@')[0]?.replace(/[^\w ]/g, ''));
-      if (contact !== '')
+      if (isGroup || isNewsletter) {
+        // For groups and newsletters, just remove @ part
+        contact = contact.split('@')[0];
+      } else {
+        // For regular contacts, properly format the phone number
+        contact = formatPhoneNumber(contact);
+      }
+
+      if (contact !== '') {
         if (isGroup) (localArr as any).push(`${contact}@g.us`);
         else if (isNewsletter) (localArr as any).push(`${contact}@newsletter`);
         else if (isLid || contact.length > 14)
           (localArr as any).push(`${contact}@lid`);
         else (localArr as any).push(`${contact}@c.us`);
+      }
     }
   }
 
